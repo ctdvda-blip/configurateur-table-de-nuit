@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configurateur — Table de nuit</title>
+<style>
+  :root{
+    --bg:#14151a; --panel:#1c1e25; --panel-2:#23262f; --line:#31353f;
+    --txt:#e9eaee; --txt-dim:#9aa0ad; --accent:#c79a5a; --accent-soft:#c79a5a22;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:"Inter",-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--txt); overflow:hidden;
+  }
+  #app{display:flex; height:100vh; width:100vw}
+
+  /* ---------- Panneau de configuration ---------- */
+  #ui{
+    width:340px; min-width:340px; height:100%; overflow-y:auto;
+    background:var(--panel); border-right:1px solid var(--line);
+    padding:20px 18px 28px; scrollbar-width:thin; scrollbar-color:#3c4150 var(--panel);
+  }
+  #ui::-webkit-scrollbar{width:8px}
+  #ui::-webkit-scrollbar-thumb{background:#3c4150;border-radius:4px}
+  .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+  .brand h1{font-size:16px;letter-spacing:.14em;text-transform:uppercase;margin:0;font-weight:600}
+  .brand span{font-size:11px;color:var(--accent);letter-spacing:.18em;text-transform:uppercase}
+  .sub{font-size:11.5px;color:var(--txt-dim);margin:0 0 18px;line-height:1.5}
+
+  .group{margin-bottom:20px}
+  .group > h2{
+    font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--txt-dim); margin:0 0 10px; font-weight:600;
+    display:flex; align-items:center; gap:8px;
+  }
+  .group > h2::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+  .row label{font-size:12.5px;color:#cfd3dc}
+  .row .val{font-size:12px;color:var(--accent);font-variant-numeric:tabular-nums}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0 0 12px;cursor:pointer
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:2px}
+  input[type=range]::-moz-range-track{height:3px;background:var(--line);border-radius:2px}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);
+    margin-top:-5.5px;border:none;box-shadow:0 0 0 3px var(--accent-soft)
+  }
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:none}
+
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{
+    flex:1 1 0; min-width:60px; padding:8px 6px; font-size:11.5px; font-family:inherit;
+    background:var(--panel-2); color:#c3c8d2; border:1px solid var(--line);
+    border-radius:8px; cursor:pointer; transition:.15s; line-height:1.25;
+  }
+  .seg button:hover{border-color:#4b515f;color:#fff}
+  .seg button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+  .swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+  .sw{position:relative;aspect-ratio:1;border-radius:8px;border:2px solid transparent;cursor:pointer;overflow:hidden;background:#333}
+  .sw::after{content:"";position:absolute;inset:0;border-radius:6px;box-shadow:inset 0 0 0 1px #0006}
+  .sw.on{border-color:var(--accent);transform:scale(1.04)}
+  .sw.wide{grid-column:span 5;aspect-ratio:auto;padding:7px;font-size:11.5px;text-align:center;color:#c3c8d2;background:var(--panel-2);border:1px solid var(--line)}
+  .sw.wide.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .matname{font-size:11px;color:var(--txt-dim);margin-top:8px;min-height:14px}
+
+  .check{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#cfd3dc;margin-bottom:9px;cursor:pointer;user-select:none}
+  .check input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+
+  .price{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;margin-bottom:14px}
+  .price .big{font-size:23px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+  .price .lbl{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:3px}
+  .price .det{font-size:11px;color:var(--txt-dim);margin-top:7px;line-height:1.6}
+
+  .actions{display:flex;gap:7px;flex-wrap:wrap}
+  .actions button{
+    flex:1 1 46%; padding:9px 6px; font-size:11.5px; font-family:inherit; cursor:pointer;
+    background:var(--panel-2); color:#cfd3dc; border:1px solid var(--line); border-radius:8px; transition:.15s
+  }
+  .actions button:hover{border-color:var(--accent);color:var(--accent)}
+  .note{font-size:10.5px;color:var(--txt-dim);line-height:1.6;margin:11px 0 0}
+  .note code{color:#c3c8d2;font-size:10px}
+  .note b{color:#c3c8d2}
+
+  /* ---------- Zone 3D ---------- */
+  #stage{position:relative;flex:1;min-width:0}
+  #stage canvas{display:block;width:100%;height:100%}
+  .hud{position:absolute;pointer-events:none;font-size:11px;color:#0009}
+  #dims{
+    left:18px;bottom:16px;background:#ffffffcc;padding:7px 12px;border-radius:20px;
+    font-variant-numeric:tabular-nums;letter-spacing:.06em;backdrop-filter:blur(6px)
+  }
+  #hint{right:18px;bottom:16px;color:#00000066}
+  #views{position:absolute;top:16px;right:16px;display:flex;gap:6px}
+  #views button{
+    pointer-events:auto;padding:7px 11px;font-size:11px;font-family:inherit;cursor:pointer;
+    background:#ffffffd0;border:1px solid #00000018;border-radius:7px;color:#333;backdrop-filter:blur(6px);transition:.15s
+  }
+  #views button:hover{background:#fff;color:#000}
+  #loader{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);color:var(--txt-dim);font-size:13px;letter-spacing:.1em;z-index:5
+  }
+  #burger{display:none}
+
+  @media (max-width:820px){
+    #app{flex-direction:column-reverse}
+    #ui{width:100%;min-width:0;height:52%;border-right:none;border-top:1px solid var(--line)}
+    #stage{height:48%}
+    .swatches{grid-template-columns:repeat(8,1fr)}
+    .sw.wide{grid-column:span 8}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ======================= UI ======================= -->
+  <aside id="ui">
+    <div class="brand"><h1>Table&nbsp;de&nbsp;nuit</h1><span>configurateur</span></div>
+    <p class="sub">4 pieds · 1 à 3 tiroirs · essences et finitions au choix. Le rendu 3D se met à jour en temps réel.</p>
+
+    <div class="group">
+      <h2>Dimensions</h2>
+      <div class="row"><label>Largeur</label><span class="val" id="v-W">45 cm</span></div>
+      <input type="range" id="W" min="32" max="70" step="1" value="45">
+      <div class="row"><label>Profondeur</label><span class="val" id="v-D">38 cm</span></div>
+      <input type="range" id="D" min="28" max="52" step="1" value="38">
+      <div class="row"><label>Hauteur totale</label><span class="val" id="v-H">55 cm</span></div>
+      <input type="range" id="H" min="40" max="75" step="1" value="55">
+      <div class="row"><label>Hauteur des pieds</label><span class="val" id="v-legH">14 cm</span></div>
+      <input type="range" id="legH" min="5" max="28" step="1" value="14">
+    </div>
+
+    <div class="group">
+      <h2>Tiroirs</h2>
+      <div class="seg" id="seg-drawers">
+        <button data-v="1">1 tiroir</button>
+        <button data-v="2" class="on">2 tiroirs</button>
+        <button data-v="3">3 tiroirs</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Pieds</h2>
+      <div class="seg" id="seg-leg">
+        <button data-v="droit">Droit carré</button>
+        <button data-v="fusele" class="on">Fuselé</button>
+        <button data-v="compas">Compas</button>
+        <button data-v="epingle">Épingle métal</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Matériau du caisson</h2>
+      <div class="swatches" id="sw-body"></div>
+      <div class="matname" id="name-body"></div>
+    </div>
+
+    <div class="group">
+      <h2>Façade des tiroirs</h2>
+      <div class="swatches" id="sw-front"></div>
+      <div class="matname" id="name-front"></div>
+    </div>
+
+    <div class="group">
+      <h2>Poignées</h2>
+      <div class="seg" id="seg-handle">
+        <button data-v="gorge">Gorge usinée</button>
+        <button data-v="bouton" class="on">Bouton</button>
+        <button data-v="barre">Barre</button>
+        <button data-v="cuir">Lanière cuir</button>
+      </div>
+      <div style="height:8px"></div>
+      <div class="seg" id="seg-hardware">
+        <button data-v="laiton" class="on">Laiton</button>
+        <button data-v="noir">Noir mat</button>
+        <button data-v="chrome">Chrome</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Options</h2>
+      <label class="check"><input type="checkbox" id="opt-overhang"> Plateau débordant</label>
+      <label class="check"><input type="checkbox" id="opt-open"> Tiroirs ouverts</label>
+      <label class="check"><input type="checkbox" id="opt-rotate"> Rotation automatique</label>
+      <label class="check"><input type="checkbox" id="opt-scene" checked> Décor & ombre portée</label>
+    </div>
+
+    <div class="group">
+      <h2>Estimation</h2>
+      <div class="price">
+        <div class="lbl">Prix indicatif</div>
+        <div class="big" id="price">—</div>
+        <div class="det" id="detail"></div>
+      </div>
+      <div class="actions">
+        <button id="btn-obj">Modèle 3D · OBJ</button>
+        <button id="btn-stl">Modèle 3D · STL</button>
+        <button id="btn-glb">Modèle 3D · GLB</button>
+        <button id="btn-png">Image PNG</button>
+        <button id="btn-spec">Fiche technique</button>
+        <button id="btn-reset">Réinitialiser</button>
+      </div>
+      <p class="note">OBJ et STL sont exportés en <b>millimètres</b> ; l'OBJ est accompagné de son
+      fichier <code>.mtl</code> (deux téléchargements).
+      Pour un <b>STEP</b>, importez l'OBJ ou le STL dans un modeleur CAO (Rhino, FreeCAD, Fusion)
+      puis ré-exportez : un STEP est un format solide B-Rep qui ne peut pas être produit
+      depuis le navigateur.</p>
+    </div>
+  </aside>
+
+  <!-- ======================= 3D ======================= -->
+  <main id="stage">
+    <div id="loader">CHARGEMENT DE LA SCÈNE 3D…</div>
+    <div id="views">
+      <button data-view="iso">3/4</button>
+      <button data-view="face">Face</button>
+      <button data-view="cote">Côté</button>
+      <button data-view="haut">Dessus</button>
+    </div>
+    <div class="hud" id="dims"></div>
+    <div class="hud" id="hint">Clic gauche : orbite · molette : zoom · clic droit : déplacer</div>
+  </main>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+
+/* =======================================================================
+   1. CATALOGUE MATÉRIAUX
+   ======================================================================= */
+const MATERIALS = {
+  chene:      {name:'Chêne clair',        base:'#c99a63', grain:'#9d6f3c', rough:0.55, type:'wood',    price:110},
+  chene_fume: {name:'Chêne fumé',         base:'#6d5949', grain:'#3f3226', rough:0.55, type:'wood',    price:135},
+  noyer:      {name:'Noyer massif',       base:'#6d4529', grain:'#3d2415', rough:0.5,  type:'wood',    price:190},
+  frene:      {name:'Frêne blanchi',      base:'#ddcbb0', grain:'#bda282', rough:0.6,  type:'wood',    price:120},
+  teck:       {name:'Teck',               base:'#a9743d', grain:'#764823', rough:0.5,  type:'wood',    price:210},
+  noirci:     {name:'Chêne noirci',       base:'#332d28', grain:'#151210', rough:0.6,  type:'wood',    price:140},
+  blanc:      {name:'Laqué blanc mat',    base:'#eceae6',                  rough:0.35, type:'lacquer', price:95},
+  noir:       {name:'Laqué noir mat',     base:'#1e1e21',                  rough:0.35, type:'lacquer', price:95},
+  olive:      {name:'Laqué vert olive',   base:'#5d6349',                  rough:0.4,  type:'lacquer', price:105},
+  terracotta: {name:'Laqué terracotta',   base:'#a35f45',                  rough:0.4,  type:'lacquer', price:105}
+};
+const HARDWARE = {
+  laiton: {name:'Laiton',   color:'#b98f4a', metal:1, rough:0.32},
+  noir:   {name:'Noir mat', color:'#1b1b1d', metal:0.6, rough:0.62},
+  chrome: {name:'Chrome',   color:'#d9dade', metal:1, rough:0.11}
+};
+const LEGS = {
+  droit:   {name:'Droit carré', price:45},
+  fusele:  {name:'Fuselé',      price:60},
+  compas:  {name:'Compas',      price:75},
+  epingle: {name:'Épingle',     price:55}
+};
+const HANDLES = {
+  gorge:  {name:'Gorge usinée',  price:0},
+  bouton: {name:'Bouton',        price:9},
+  barre:  {name:'Barre',         price:16},
+  cuir:   {name:'Lanière cuir',  price:14}
+};
+
+/* =======================================================================
+   2. ÉTAT
+   ======================================================================= */
+const DEFAULTS = {
+  W:45, D:38, H:55, legH:14, drawers:2, leg:'fusele',
+  body:'chene', front:'same', handle:'bouton', hardware:'laiton',
+  overhang:false, open:false, rotate:false, scene:true
+};
+const P = {...DEFAULTS};
+
+// Épaisseurs de fabrication (mètres)
+const T      = 0.018;  // panneaux caisson
+const T_TOP  = 0.020;  // plateau
+const T_BACK = 0.010;  // panneau de fond
+const T_BOX  = 0.012;  // caisse de tiroir
+const GAP    = 0.003;  // jeu entre façades
+const cm = v => v / 100;
+
+/* =======================================================================
+   3. SCÈNE
+   ======================================================================= */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#dcd7cf');
+
+const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 60);
+camera.position.set(1.05, 0.72, 1.15);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 0.45;
+controls.maxDistance = 4;
+controls.maxPolarAngle = Math.PI * 0.495;   // on ne passe pas sous le sol
+controls.target.set(0, 0.30, 0);
+
+// Éclairage d'ambiance (studio) via PMREM
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const key = new THREE.DirectionalLight(0xfff4e6, 2.1);
+key.position.set(1.6, 2.6, 1.5);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+const sc = key.shadow.camera;
+sc.left = -1.4; sc.right = 1.4; sc.top = 1.4; sc.bottom = -1.4; sc.near = 0.3; sc.far = 7;
+key.shadow.bias = -0.0007;
+key.shadow.normalBias = 0.012;
+scene.add(key);
+
+const fill = new THREE.DirectionalLight(0xd9e4ff, 0.5);
+fill.position.set(-2, 1.2, -1.4);
+scene.add(fill);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8f8f88, 0.35));
+
+// Sol
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(6, 64),
+  new THREE.MeshStandardMaterial({color:'#c9c3b8', roughness:0.92, metalness:0})
+);
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Groupe meuble
+const furniture = new THREE.Group();
+scene.add(furniture);
+
+/* =======================================================================
+   4. TEXTURES & MATÉRIAUX
+   ======================================================================= */
+const texCache = new Map();
+const matCache = new Map();
+const TILE = 0.55;   // taille physique d'une répétition de texture (m)
+
+/** Nom de matériau exploitable par les formats d'échange (OBJ/MTL, GLB). */
+const DIA  = new RegExp('[\u0300-\u036f]', 'g');   // marques diacritiques
+const slug = s => s.normalize('NFD').replace(DIA,'')
+                   .replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');
+
+function makeWoodCanvas(spec){
+  const S = 512;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = spec.base; g.fillRect(0,0,S,S);
+
+  // Veines longitudinales (suivent l'axe U)
+  for (let i=0;i<300;i++){
+    let y = Math.random()*S;
+    g.strokeStyle = spec.grain;
+    g.globalAlpha = 0.03 + Math.random()*0.13;
+    g.lineWidth = 0.4 + Math.random()*2.4;
+    g.beginPath(); g.moveTo(0,y);
+    for (let x=0;x<=S;x+=14){ y += (Math.random()-0.5)*2.6; g.lineTo(x,y); }
+    g.stroke();
+  }
+  // Figures « cathédrale »
+  for (let i=0;i<7;i++){
+    const cx = Math.random()*S, cy = Math.random()*S;
+    for (let k=0;k<10;k++){
+      g.globalAlpha = 0.05;
+      g.strokeStyle = spec.grain;
+      g.lineWidth = 0.8;
+      g.beginPath();
+      g.ellipse(cx, cy, 30+k*7, 6+k*2.2, Math.random()*0.3, 0, Math.PI*2);
+      g.stroke();
+    }
+  }
+  g.globalAlpha = 1;
+
+  // Grain fin
+  const img = g.getImageData(0,0,S,S), d = img.data;
+  for (let i=0;i<d.length;i+=4){
+    const n = (Math.random()-0.5)*13;
+    d[i]+=n; d[i+1]+=n; d[i+2]+=n;
+  }
+  g.putImageData(img,0,0);
+  return c;
+}
+
+function makeRoughCanvas(){
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#9a9a9a'; g.fillRect(0,0,S,S);
+  for (let i=0;i<180;i++){
+    let y = Math.random()*S;
+    g.strokeStyle = Math.random()>0.5 ? '#c8c8c8' : '#6e6e6e';
+    g.globalAlpha = 0.25;
+    g.lineWidth = 0.5 + Math.random()*2;
+    g.beginPath(); g.moveTo(0,y);
+    for (let x=0;x<=S;x+=16){ y += (Math.random()-0.5)*2.4; g.lineTo(x,y); }
+    g.stroke();
+  }
+  return c;
+}
+const roughCanvas = makeRoughCanvas();
+
+function woodTexture(id){
+  if (!texCache.has(id)){
+    const t = new THREE.CanvasTexture(makeWoodCanvas(MATERIALS[id]));
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const r = new THREE.CanvasTexture(roughCanvas);
+    r.wrapS = r.wrapT = THREE.RepeatWrapping;
+    texCache.set(id, {map:t, rough:r});
+  }
+  return texCache.get(id);
+}
+
+/** Matériau bois/laque, avec échelle de veinage adaptée à la pièce. */
+function surfaceMat(id, uRep, vRep){
+  const spec = MATERIALS[id];
+  if (spec.type === 'lacquer'){
+    const k = 'lac_'+id;
+    if (!matCache.has(k)) matCache.set(k, new THREE.MeshStandardMaterial({
+      name:slug(spec.name), color:new THREE.Color(spec.base), roughness:spec.rough,
+      metalness:0.02, envMapIntensity:0.9
+    }));
+    return matCache.get(k);
+  }
+  const u = Math.max(0.25, Math.round(uRep*4)/4);
+  const v = Math.max(0.25, Math.round(vRep*4)/4);
+  const k = `w_${id}_${u}_${v}`;
+  if (!matCache.has(k)){
+    const src = woodTexture(id);
+    const map = src.map.clone();   map.needsUpdate = true;
+    const rgh = src.rough.clone(); rgh.needsUpdate = true;
+    map.repeat.set(u,v); rgh.repeat.set(u,v);
+    const mat = new THREE.MeshStandardMaterial({
+      name:slug(spec.name), map, roughnessMap:rgh, roughness:spec.rough,
+      metalness:0, envMapIntensity:0.85
+    });
+    mat.userData.baseColor = spec.base;   // couleur à plat pour les exports OBJ/MTL
+    matCache.set(k, mat);
+  }
+  return matCache.get(k);
+}
+
+function hardwareMat(){
+  const h = HARDWARE[P.hardware];
+  const k = 'hw_'+P.hardware;
+  if (!matCache.has(k)) matCache.set(k, new THREE.MeshStandardMaterial({
+    name:'Quincaillerie_'+slug(h.name), color:new THREE.Color(h.color),
+    metalness:h.metal, roughness:h.rough, envMapIntensity:1.3
+  }));
+  return matCache.get(k);
+}
+const leatherMat   = new THREE.MeshStandardMaterial({name:'Cuir',           color:'#6b4a2f', roughness:0.75, metalness:0});
+// Intérieurs peu exposés : on baisse la réponse à l'environnement pour que
+// les jeux entre façades se lisent comme des lignes d'ombre.
+const plywoodMat   = new THREE.MeshStandardMaterial({name:'Contreplaque',   color:'#b59a70', roughness:0.9,  metalness:0, envMapIntensity:0.3});
+const shadowGapMat = new THREE.MeshStandardMaterial({name:'Interieur_mat',  color:'#241f1a', roughness:1,    metalness:0, envMapIntensity:0.25, side:THREE.BackSide});
+
+/* =======================================================================
+   5. CONSTRUCTION DU MEUBLE
+   ======================================================================= */
+const disposables = [];   // géométries à libérer à chaque reconstruction
+
+function box(w,h,d,mat){
+  const g = new THREE.BoxGeometry(w,h,d);
+  disposables.push(g);
+  const m = new THREE.Mesh(g, mat);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+/** Panneau bois : le veinage suit la plus grande dimension. */
+function panel(w,h,d,id){
+  const dims = [w,h,d].sort((a,b)=>b-a);
+  return box(w,h,d, surfaceMat(id, dims[0]/TILE, dims[1]/TILE));
+}
+
+function clearGroup(g){
+  g.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+  g.clear();
+}
+
+let drawerGroups = [];
+
+function build(){
+  clearGroup(furniture);
+  disposables.length = 0;
+  drawerGroups = [];
+
+  const W = cm(P.W), D = cm(P.D), H = cm(P.H);
+  const legH = Math.min(cm(P.legH), H - 0.18);
+  const bodyH = H - legH;                  // hauteur du caisson (plateau compris)
+  const sideH = bodyH - T_TOP;             // hauteur des joues
+  const bodyId  = P.body;
+  const frontId = P.front === 'same' ? P.body : P.front;
+  const ov = P.overhang ? 0.018 : 0;
+
+  /* ---- Plateau ---- */
+  const top = panel(W + ov*2, T_TOP, D + ov, bodyId);
+  top.position.set(0, H - T_TOP/2, ov/2);
+  furniture.add(top);
+
+  /* ---- Joues ---- */
+  for (const s of [-1, 1]){
+    const side = panel(T, sideH, D, bodyId);
+    side.position.set(s*(W-T)/2, legH + sideH/2, 0);
+    furniture.add(side);
+  }
+
+  /* ---- Fond du caisson ---- */
+  const bottom = panel(W - 2*T, T, D, bodyId);
+  bottom.position.set(0, legH + T/2, 0);
+  furniture.add(bottom);
+
+  /* ---- Panneau arrière ---- */
+  const back = panel(W - 2*T, sideH - T, T_BACK, bodyId);
+  back.position.set(0, legH + T + (sideH - T)/2, -D/2 + T_BACK/2);
+  furniture.add(back);
+
+  /* ---- Doublure intérieure sombre : donne de la profondeur aux jeux ----
+     Faces inversées (BackSide) : la face avant n'occulte pas les façades. */
+  const caveD = D - T - T_BACK;
+  const cave = box(W - 2*T - 0.002, sideH - T - 0.002, caveD, shadowGapMat);
+  cave.position.set(0, legH + T + (sideH - T)/2, (T_BACK - T)/2);
+  cave.castShadow = cave.receiveShadow = false;
+  cave.userData.helper = true;   // volume d'ambiance : exclu des exports
+  furniture.add(cave);
+
+  /* ---- Tiroirs ---- */
+  const n  = P.drawers;
+  const Hi = sideH - T;                       // hauteur utile
+  const Wi = W - 2*T;                         // largeur utile
+  const fh = (Hi - GAP*(n+1)) / n;            // hauteur d'une façade
+  const fw = Wi - 2*GAP;
+  const travel = (D - 0.05) * 0.5;            // course d'ouverture
+
+  for (let i=0;i<n;i++){
+    const grp = new THREE.Group();
+    const cy = legH + T + GAP + i*(fh + GAP) + fh/2;
+
+    // Façade — en mode « gorge », la partie haute est reculée pour former la prise
+    const gh = P.handle === 'gorge' ? Math.min(0.026, fh*0.3) : 0;
+    const front = panel(fw, fh - gh, T, frontId);
+    front.position.set(0, cy - gh/2, D/2 - T/2);
+    grp.add(front);
+    if (gh){
+      const rec = panel(fw, gh, T, frontId);
+      rec.position.set(0, cy + (fh - gh)/2, D/2 - T/2 - 0.018);
+      grp.add(rec);
+    }
+
+    // Caisse (visible à l'ouverture)
+    const bxH = Math.max(0.05, fh * 0.78);
+    const bxD = D - 0.045;
+    const bxY = cy - fh/2 + bxH/2 + 0.006;
+    const bxZ = D/2 - T - bxD/2;
+    const bBottom = box(fw - 0.02, T_BOX, bxD, plywoodMat);
+    bBottom.position.set(0, bxY - bxH/2 + T_BOX/2, bxZ);
+    grp.add(bBottom);
+    for (const s of [-1,1]){
+      const sd = box(T_BOX, bxH, bxD, plywoodMat);
+      sd.position.set(s*(fw - 0.02 - T_BOX)/2, bxY, bxZ);
+      grp.add(sd);
+    }
+    const bBack = box(fw - 0.02 - 2*T_BOX, bxH, T_BOX, plywoodMat);
+    bBack.position.set(0, bxY, bxZ - bxD/2 + T_BOX/2);
+    grp.add(bBack);
+
+    // Poignée
+    addHandle(grp, cy, fh, fw, D);
+
+    grp.userData.travel = travel;
+    grp.userData.factor = n === 1 ? 1 : (i === n-1 ? 1 : 0.55 + 0.45*(i/(n-1)));
+    furniture.add(grp);
+    drawerGroups.push(grp);
+  }
+
+  /* ---- Pieds ---- */
+  buildLegs(W, D, legH);
+
+  updateHud();
+  frameTarget(H);
+}
+
+function addHandle(grp, cy, fh, fw, D){
+  const z = D/2;
+  const hw = hardwareMat();
+
+  if (P.handle === 'gorge') return;   // la prise est modelée dans la façade
+
+  if (P.handle === 'bouton'){
+    const n = fw > 0.52 ? 2 : 1;
+    for (let k=0;k<n;k++){
+      const x = n === 1 ? 0 : (k ? 1 : -1) * fw*0.22;
+      const gStem = new THREE.CylinderGeometry(0.005, 0.005, 0.014, 16);
+      const gHead = new THREE.SphereGeometry(0.013, 24, 16);
+      disposables.push(gStem, gHead);
+      const stem = new THREE.Mesh(gStem, hw);
+      stem.rotation.x = Math.PI/2;
+      stem.position.set(x, cy, z + 0.007);
+      const head = new THREE.Mesh(gHead, hw);
+      head.position.set(x, cy, z + 0.020);
+      head.scale.set(1, 1, 0.75);
+      stem.castShadow = head.castShadow = true;
+      grp.add(stem, head);
+    }
+    return;
+  }
+
+  if (P.handle === 'barre'){
+    const L = Math.min(fw*0.55, 0.24);
+    const gBar = new THREE.CylinderGeometry(0.006, 0.006, L, 20);
+    disposables.push(gBar);
+    const bar = new THREE.Mesh(gBar, hw);
+    bar.rotation.z = Math.PI/2;
+    bar.position.set(0, cy, z + 0.034);
+    bar.castShadow = true;
+    grp.add(bar);
+    for (const s of [-1,1]){
+      const gSup = new THREE.CylinderGeometry(0.005, 0.005, 0.030, 14);
+      disposables.push(gSup);
+      const sup = new THREE.Mesh(gSup, hw);
+      sup.rotation.x = Math.PI/2;
+      sup.position.set(s*L/2, cy, z + 0.017);
+      sup.castShadow = true;
+      grp.add(sup);
+    }
+    return;
+  }
+
+  if (P.handle === 'cuir'){
+    // Demi-anneau orienté vers l'avant
+    const R = Math.min(0.035, fh*0.34);
+    const gLoop = new THREE.TorusGeometry(R, 0.005, 10, 28, Math.PI);
+    gLoop.rotateZ(-Math.PI/2);
+    gLoop.rotateY(-Math.PI/2);
+    gLoop.scale(1, 1, 0.7);
+    disposables.push(gLoop);
+    const loop = new THREE.Mesh(gLoop, leatherMat);
+    loop.position.set(0, cy, z);
+    loop.castShadow = true;
+    grp.add(loop);
+    for (const s of [-1,1]){
+      const gRiv = new THREE.CylinderGeometry(0.006, 0.006, 0.008, 14);
+      disposables.push(gRiv);
+      const riv = new THREE.Mesh(gRiv, hw);
+      riv.rotation.x = Math.PI/2;
+      riv.position.set(0, cy + s*R, z + 0.004);
+      grp.add(riv);
+    }
+  }
+}
+
+function buildLegs(W, D, legH){
+  const hw = hardwareMat();
+  const woodMat = surfaceMat(P.body, legH/TILE, 0.08/TILE);
+
+  const inset = P.leg === 'epingle' ? 0.035 : (P.leg === 'droit' ? 0.02 : 0.028);
+  const corners = [[-1,-1],[1,-1],[-1,1],[1,1]];
+
+  for (const [sx, sz] of corners){
+    const x = sx*(W/2 - inset);
+    const z = sz*(D/2 - inset);
+
+    if (P.leg === 'droit'){
+      const l = box(0.038, legH, 0.038, woodMat);
+      l.position.set(x, legH/2, z);
+      furniture.add(l);
+
+    } else if (P.leg === 'fusele'){
+      const g = new THREE.CylinderGeometry(0.024, 0.013, legH, 24);
+      disposables.push(g);
+      const l = new THREE.Mesh(g, woodMat);
+      l.castShadow = l.receiveShadow = true;
+      l.position.set(x, legH/2, z);
+      furniture.add(l);
+
+    } else if (P.leg === 'compas'){
+      // Inclinaison sur les deux axes : on calcule l'axe réel du pied
+      const a = 0.16;                                   // ~9°
+      const dir = new THREE.Vector3(sx*Math.tan(a), -1, sz*Math.tan(a)).normalize();
+      const len = legH / Math.abs(dir.y);               // le pied touche le sol
+      const g = new THREE.CylinderGeometry(0.024, 0.013, len, 24);
+      g.translate(0, -len/2, 0);                        // pivot en haut
+      disposables.push(g);
+      const l = new THREE.Mesh(g, woodMat);
+      l.castShadow = l.receiveShadow = true;
+      l.position.set(x, legH, z);
+      l.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0), dir);
+      furniture.add(l);
+
+    } else { // épingle métal
+      const a = 0.22;
+      const len = (legH - 0.004) / Math.cos(a);
+      const plate = box(0.05, 0.006, 0.05, hw);
+      plate.position.set(x, legH - 0.003, z);
+      furniture.add(plate);
+      const dirs = [[sx, 0],[0, sz]];
+      for (const [dx, dz] of dirs){
+        const g = new THREE.CylinderGeometry(0.005, 0.005, len, 12);
+        g.translate(0, -len/2, 0);
+        disposables.push(g);
+        const rod = new THREE.Mesh(g, hw);
+        rod.castShadow = true;
+        rod.position.set(x, legH - 0.004, z);
+        rod.rotation.set(-dz*a, 0, dx*a, 'XZY');
+        furniture.add(rod);
+      }
+    }
+  }
+}
+
+/* =======================================================================
+   6. HUD, PRIX, CAMÉRA
+   ======================================================================= */
+function frameTarget(H){
+  controls.target.lerp(new THREE.Vector3(0, H*0.52, 0), 1);
+}
+
+function updateHud(){
+  document.getElementById('dims').textContent =
+    `${P.W} × ${P.D} × ${P.H} cm  ·  ${P.drawers} tiroir${P.drawers>1?'s':''}  ·  ${LEGS[P.leg].name}`;
+  updatePrice();
+}
+
+function updatePrice(){
+  const W = cm(P.W), D = cm(P.D), H = cm(P.H), legH = cm(P.legH);
+  const bodyH = H - legH, sideH = bodyH - T_TOP;
+  const frontId = P.front === 'same' ? P.body : P.front;
+
+  const aBody  = (W*D) + 2*(sideH*D) + ((W-2*T)*D) + ((W-2*T)*(sideH-T));   // m² caisson
+  const Hi = sideH - T, Wi = W - 2*T;
+  const aFront = Wi * Hi;                                                   // m² façades
+
+  const cBody  = aBody  * MATERIALS[P.body].price;
+  const cFront = aFront * MATERIALS[frontId].price;
+  const cDraw  = P.drawers * 34;                 // coulisses + caisse
+  const cLegs  = LEGS[P.leg].price;
+  const cHand  = P.drawers * HANDLES[P.handle].price * (P.handle==='bouton' && Wi>0.52 ? 2 : 1);
+  const cLabor = 145;
+  const total  = cBody + cFront + cDraw + cLegs + cHand + cLabor;
+
+  document.getElementById('price').textContent =
+    total.toLocaleString('fr-FR', {maximumFractionDigits:0}) + ' €';
+  document.getElementById('detail').innerHTML =
+    `Panneaux : ${(aBody+aFront).toFixed(2)} m² · Caisson ${Math.round(cBody)} € · Façades ${Math.round(cFront)} €<br>`+
+    `Tiroirs ${cDraw} € · Pieds ${cLegs} € · Quincaillerie ${Math.round(cHand)} € · Façonnage ${cLabor} €`;
+
+  return {aBody, aFront, cBody, cFront, cDraw, cLegs, cHand, cLabor, total};
+}
+
+/* =======================================================================
+   7. INTERFACE
+   ======================================================================= */
+function buildSwatches(hostId, nameId, key, withSame){
+  const host = document.getElementById(hostId);
+  host.innerHTML = '';
+  if (withSame){
+    const b = document.createElement('div');
+    b.className = 'sw wide'; b.dataset.v = 'same';
+    b.textContent = 'Identique au caisson';
+    host.appendChild(b);
+  }
+  for (const [id, m] of Object.entries(MATERIALS)){
+    const b = document.createElement('div');
+    b.className = 'sw'; b.dataset.v = id; b.title = m.name;
+    b.style.background = m.type === 'wood'
+      ? `linear-gradient(160deg, ${m.base}, ${m.grain})`
+      : m.base;
+    host.appendChild(b);
+  }
+  host.addEventListener('click', e => {
+    const el = e.target.closest('.sw'); if (!el) return;
+    P[key] = el.dataset.v;
+    refreshSwatches(hostId, nameId, key);
+    build();
+  });
+  refreshSwatches(hostId, nameId, key);
+}
+function refreshSwatches(hostId, nameId, key){
+  const host = document.getElementById(hostId);
+  host.querySelectorAll('.sw').forEach(el => el.classList.toggle('on', el.dataset.v === P[key]));
+  const v = P[key];
+  document.getElementById(nameId).textContent =
+    v === 'same' ? 'Identique au caisson — ' + MATERIALS[P.body].name : MATERIALS[v].name;
+}
+
+function bindSeg(id, key, cast = v => v){
+  const host = document.getElementById(id);
+  host.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    P[key] = cast(b.dataset.v);
+    host.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    build();
+  });
+}
+function bindRange(id, key, unit = ' cm'){
+  const el = document.getElementById(id), out = document.getElementById('v-'+id);
+  const sync = () => {
+    P[key] = +el.value;
+    out.textContent = el.value + unit;
+    // La hauteur des pieds ne peut pas dévorer le caisson
+    const maxLeg = Math.max(5, P.H - 22);
+    const legEl = document.getElementById('legH');
+    legEl.max = maxLeg;
+    if (P.legH > maxLeg){ P.legH = maxLeg; legEl.value = maxLeg; document.getElementById('v-legH').textContent = maxLeg+' cm'; }
+    build();
+  };
+  el.addEventListener('input', sync);
+}
+function bindCheck(id, key, after){
+  const el = document.getElementById(id);
+  el.addEventListener('change', () => { P[key] = el.checked; if (after) after(); });
+}
+
+bindRange('W','W'); bindRange('D','D'); bindRange('H','H'); bindRange('legH','legH');
+bindSeg('seg-drawers','drawers', v => +v);
+bindSeg('seg-leg','leg');
+bindSeg('seg-handle','handle');
+bindSeg('seg-hardware','hardware');
+buildSwatches('sw-body','name-body','body', false);
+buildSwatches('sw-front','name-front','front', true);
+bindCheck('opt-overhang','overhang', build);
+bindCheck('opt-open','open');
+bindCheck('opt-rotate','rotate', () => controls.autoRotate = P.rotate);
+bindCheck('opt-scene','scene', () => {
+  floor.visible = P.scene;
+  key.castShadow = P.scene;
+  scene.background = new THREE.Color(P.scene ? '#dcd7cf' : '#f2f0ec');
+});
+controls.autoRotateSpeed = 1.1;
+
+// Vues prédéfinies
+document.getElementById('views').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const H = cm(P.H), d = Math.max(cm(P.W), cm(P.D)) * 2.6;
+  const t = new THREE.Vector3(0, H*0.52, 0);
+  const pos = {
+    iso:  new THREE.Vector3( d*0.62, H*1.15, d*0.72),
+    face: new THREE.Vector3( 0,      H*0.6,  d*0.95),
+    cote: new THREE.Vector3( d*0.95, H*0.6,  0),
+    haut: new THREE.Vector3( 0.001,  d*1.15, 0.35)
+  }[b.dataset.view];
+  animateCamera(pos, t);
+});
+let camAnim = null;
+function animateCamera(pos, target){
+  camAnim = {from:camera.position.clone(), to:pos, ft:controls.target.clone(), tt:target, t:0};
+}
+
+/* ---- Exports ---- */
+const stamp = () => `table-de-nuit_${P.W}x${P.D}x${P.H}_${P.drawers}T`;
+
+function download(data, filename, mime){
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(new Blob([data], {type:mime}));
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+}
+
+/** Copie du meuble prête à l'export : sans volumes d'aide, à l'échelle voulue. */
+function exportRoot(scale){
+  const root = furniture.clone(true);
+  const drop = [];
+  root.traverse(o => { if (o.userData && o.userData.helper) drop.push(o); });
+  drop.forEach(o => o.parent && o.parent.remove(o));
+  root.scale.setScalar(scale);
+  root.updateMatrixWorld(true);
+  return root;
+}
+
+/** Fichier .mtl décrivant les matériaux référencés par l'OBJ. */
+function buildMTL(root){
+  const seen = new Map();
+  root.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const m = o.material;
+    if (m.name && !seen.has(m.name)) seen.set(m.name, m);
+  });
+  let out = `# Table de nuit - matériaux\n# ${new Date().toISOString().slice(0,10)}\n`;
+  for (const [name, m] of seen){
+    const c = new THREE.Color(m.userData.baseColor || m.color);
+    const spec = 1 - (m.roughness ?? 0.5);
+    out += `\nnewmtl ${name}\n`;
+    out += `Kd ${c.r.toFixed(4)} ${c.g.toFixed(4)} ${c.b.toFixed(4)}\n`;
+    out += `Ka 0.0000 0.0000 0.0000\n`;
+    out += `Ks ${spec.toFixed(4)} ${spec.toFixed(4)} ${spec.toFixed(4)}\n`;
+    out += `Ns ${(spec*200).toFixed(1)}\n`;
+    out += `d 1.0\nillum 2\n`;
+  }
+  return out;
+}
+
+document.getElementById('btn-obj').addEventListener('click', () => {
+  const root = exportRoot(1000);                    // mètres -> millimètres
+  const base = stamp();
+  const obj  = `# ${base}\n# unités : millimètres\nmtllib ${base}.mtl\n`
+             + new OBJExporter().parse(root);
+  download(obj, base + '.obj', 'text/plain;charset=utf-8');
+  setTimeout(() => download(buildMTL(root), base + '.mtl', 'text/plain;charset=utf-8'), 250);
+});
+
+document.getElementById('btn-stl').addEventListener('click', () => {
+  const buf = new STLExporter().parse(exportRoot(1000), {binary:true});
+  download(buf, stamp() + '.stl', 'model/stl');
+});
+
+document.getElementById('btn-glb').addEventListener('click', () => {
+  new GLTFExporter().parse(furniture, buf => download(buf, stamp() + '.glb', 'model/gltf-binary'),
+    err => alert('Export GLB impossible : ' + err), {binary:true});
+});
+
+document.getElementById('btn-png').addEventListener('click', () => {
+  renderer.render(scene, camera);
+  const a = document.createElement('a');
+  a.download = stamp() + '.png';
+  a.href = renderer.domElement.toDataURL('image/png');
+  a.click();
+});
+
+document.getElementById('btn-spec').addEventListener('click', () => {
+  const p = updatePrice();
+  const frontId = P.front === 'same' ? P.body : P.front;
+  const txt =
+`FICHE TECHNIQUE — TABLE DE NUIT
+Généré le ${new Date().toLocaleDateString('fr-FR')}
+
+DIMENSIONS HORS TOUT
+  Largeur ............ ${P.W} cm
+  Profondeur ......... ${P.D} cm
+  Hauteur ............ ${P.H} cm
+  Hauteur des pieds .. ${P.legH} cm
+  Hauteur du caisson . ${(P.H - P.legH).toFixed(0)} cm
+
+COMPOSITION
+  Tiroirs ............ ${P.drawers}
+  Pieds .............. 4 × ${LEGS[P.leg].name}
+  Plateau ............ ${P.overhang ? 'débordant (18 mm de débord)' : 'affleurant'}
+
+MATÉRIAUX
+  Caisson & plateau .. ${MATERIALS[P.body].name}
+  Façades tiroirs .... ${MATERIALS[frontId].name}
+  Poignées ........... ${HANDLES[P.handle].name}${P.handle==='gorge'?'':' — finition '+HARDWARE[P.hardware].name}
+  Caisses tiroirs .... contreplaqué bouleau 12 mm
+
+QUANTITATIF
+  Panneaux caisson ... ${p.aBody.toFixed(2)} m² (ép. 18 mm / plateau 20 mm)
+  Panneaux façades ... ${p.aFront.toFixed(2)} m² (ép. 18 mm)
+  Fond ............... panneau 10 mm
+
+ESTIMATION
+  Caisson ............ ${Math.round(p.cBody)} €
+  Façades ............ ${Math.round(p.cFront)} €
+  Tiroirs (coulisses) ${p.cDraw} €
+  Pieds .............. ${p.cLegs} €
+  Quincaillerie ...... ${Math.round(p.cHand)} €
+  Façonnage .......... ${p.cLabor} €
+  ------------------------------
+  TOTAL INDICATIF .... ${Math.round(p.total)} €
+
+Prix indicatifs, hors finition sur mesure et transport.
+`;
+  const a = document.createElement('a');
+  a.download = 'fiche-table-de-nuit.txt';
+  a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain;charset=utf-8'}));
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  Object.assign(P, DEFAULTS);
+  for (const k of ['W','D','H','legH']){
+    const el = document.getElementById(k);
+    el.value = P[k];
+    document.getElementById('v-'+k).textContent = P[k] + ' cm';
+  }
+  const setSeg = (id, v) => document.getElementById(id).querySelectorAll('button')
+    .forEach(b => b.classList.toggle('on', b.dataset.v == v));
+  setSeg('seg-drawers', P.drawers); setSeg('seg-leg', P.leg);
+  setSeg('seg-handle', P.handle);   setSeg('seg-hardware', P.hardware);
+  refreshSwatches('sw-body','name-body','body');
+  refreshSwatches('sw-front','name-front','front');
+  document.getElementById('opt-overhang').checked = false;
+  document.getElementById('opt-open').checked = false;
+  document.getElementById('opt-rotate').checked = false;
+  document.getElementById('opt-scene').checked = true;
+  controls.autoRotate = false;
+  floor.visible = true; key.castShadow = true;
+  scene.background = new THREE.Color('#dcd7cf');
+  build();
+  animateCamera(new THREE.Vector3(1.05, 0.72, 1.15), new THREE.Vector3(0, cm(P.H)*0.52, 0));
+});
+
+/* =======================================================================
+   8. BOUCLE DE RENDU
+   ======================================================================= */
+function resize(){
+  const w = stage.clientWidth  || 960;
+  const h = stage.clientHeight || 640;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+const clock = new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // Ouverture / fermeture des tiroirs
+  for (const g of drawerGroups){
+    const target = P.open ? g.userData.travel * g.userData.factor : 0;
+    g.position.z += (target - g.position.z) * Math.min(1, dt * 7);
+  }
+
+  // Transition de caméra
+  if (camAnim){
+    camAnim.t = Math.min(1, camAnim.t + dt * 1.6);
+    const e = 1 - Math.pow(1 - camAnim.t, 3);
+    camera.position.lerpVectors(camAnim.from, camAnim.to, e);
+    controls.target.lerpVectors(camAnim.ft, camAnim.tt, e);
+    if (camAnim.t >= 1) camAnim = null;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* =======================================================================
+   9. DÉMARRAGE
+   ======================================================================= */
+resize();
+build();
+loop();
+document.getElementById('loader').remove();
+
+// Petite API publique (pilotage externe / capture)
+window.tableDeNuit = {THREE, scene, camera, renderer, controls, params:P, build, resize};
+</script>
+</body>
+</html>
