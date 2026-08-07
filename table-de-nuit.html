@@ -231,24 +231,41 @@
 </div>
 
 <!-- jsPDF : génération de la fiche technique (script classique, chargé avant les modules) -->
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="./vendor/jspdf.umd.min.js"></script>
 
+<!-- Bibliothèques embarquées dans le dépôt : aucun appel à un CDN,
+     la page fonctionne hors ligne et ne dépend d'aucun service tiers. -->
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
   }
 }
 </script>
 
+<script>
+  // Filet de sécurité : si le module ne démarre pas, on le dit au lieu de
+  // laisser l'écran de chargement tourner indéfiniment.
+  window.addEventListener('error', e => {
+    const l = document.getElementById('loader');
+    if (l && e.target && e.target.tagName === 'SCRIPT')
+      l.textContent = 'ÉCHEC DU CHARGEMENT DES BIBLIOTHÈQUES 3D';
+  }, true);
+  setTimeout(() => {
+    const l = document.getElementById('loader');
+    if (l) l.innerHTML = 'La scène 3D ne démarre pas.<br>Vérifiez que votre navigateur '
+                       + 'accepte les modules JavaScript et rechargez la page.';
+  }, 15000);
+</script>
+
 <script type="module">
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
-import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { OrbitControls } from 'three/addons/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
+import { GLTFExporter } from 'three/addons/GLTFExporter.js';
+import { OBJExporter } from 'three/addons/OBJExporter.js';
+import { STLExporter } from 'three/addons/STLExporter.js';
 
 /* =======================================================================
    1. CATALOGUE MATÉRIAUX
