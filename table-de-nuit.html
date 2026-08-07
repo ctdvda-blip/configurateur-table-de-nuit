@@ -205,7 +205,7 @@
         <button id="btn-stl">Modèle 3D · STL</button>
         <button id="btn-glb">Modèle 3D · GLB</button>
         <button id="btn-png">Image PNG</button>
-        <button id="btn-spec">Fiche technique</button>
+        <button id="btn-spec">Fiche technique PDF</button>
         <button id="btn-reset">Réinitialiser</button>
       </div>
       <p class="note">OBJ et STL sont exportés en <b>millimètres</b> ; l'OBJ est accompagné de son
@@ -229,6 +229,9 @@
     <div class="hud" id="hint">Clic gauche : orbite · molette : zoom · clic droit : déplacer</div>
   </main>
 </div>
+
+<!-- jsPDF : génération de la fiche technique (script classique, chargé avant les modules) -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 
 <script type="importmap">
 {
@@ -947,54 +950,244 @@ document.getElementById('btn-png').addEventListener('click', () => {
   a.click();
 });
 
-document.getElementById('btn-spec').addEventListener('click', () => {
+/* =======================================================================
+   7 bis. FICHE TECHNIQUE PDF
+   ======================================================================= */
+const PDF = {ink:'#1f2229', accent:'#b8873f', soft:'#f2ede4', grey:'#7b8290', line:'#d9d3c8'};
+const eur  = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €';
+const dateFR = () => new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
+
+/** Rendu hors écran : restitue ensuite la taille et le décor d'origine. */
+function offscreen(cam, wpx, hpx, clean){
+  const size = renderer.getSize(new THREE.Vector2());
+  const bg = scene.background, floorVis = floor.visible, sh = key.castShadow;
+  const lightPos = key.position.clone();
+  if (clean){
+    floor.visible = false; key.castShadow = false;
+    scene.background = new THREE.Color('#f6f4f0');
+    // on éclaire depuis l'axe de vue, sinon l'élévation tombe dans l'ombre
+    key.position.copy(cam.position).setY(cam.position.y + 3);
+  }
+  renderer.setSize(wpx, hpx, false);
+  renderer.render(scene, cam);
+  const url = renderer.domElement.toDataURL('image/jpeg', 0.93);
+  renderer.setSize(size.x, size.y, false);
+  scene.background = bg; floor.visible = floorVis; key.castShadow = sh;
+  key.position.copy(lightPos);
+  camera.aspect = size.x / size.y; camera.updateProjectionMatrix();
+  return url;
+}
+
+/** Perspective 3/4 pour l'illustration principale. */
+function shotHero(w, h){
+  const H = cm(P.H), d = Math.max(cm(P.W), cm(P.D)) * 2.45;
+  const c = new THREE.PerspectiveCamera(33, w/h, 0.05, 40);
+  c.position.set(d*0.6, H*1.05, d*0.82);
+  c.lookAt(0, H*0.46, 0);
+  return offscreen(c, w, h, false);
+}
+
+/** Élévation orthographique + repères pour tracer les cotes dans le PDF. */
+function shotElevation(dir, w, h){
+  const bb   = new THREE.Box3().setFromObject(furniture);
+  const size = bb.getSize(new THREE.Vector3());
+  const ctr  = bb.getCenter(new THREE.Vector3());
+  const span = dir === 'face' ? size.x : size.z;
+  const pad = 1.2, aspect = w/h;
+  let hw = span*pad/2, hh = size.y*pad/2;
+  if (hw/hh < aspect) hw = hh*aspect; else hh = hw/aspect;
+
+  const c = new THREE.OrthographicCamera(-hw, hw, hh, -hh, 0.01, 40);
+  // vue de face depuis +Z, profil depuis -X : dans les deux cas l'axe
+  // horizontal du modèle se projette vers la droite de l'image.
+  if (dir === 'face') c.position.set(ctr.x, ctr.y, ctr.z + 8);
+  else                c.position.set(ctr.x - 8, ctr.y, ctr.z);
+  c.lookAt(ctr);
+
+  return {
+    url:  offscreen(c, w, h, true),
+    hw, hh,
+    hCtr: dir === 'face' ? ctr.x : ctr.z,
+    hMin: dir === 'face' ? bb.min.x : bb.min.z,
+    hMax: dir === 'face' ? bb.max.x : bb.max.z,
+    vCtr: ctr.y, vMin: bb.min.y, vMax: bb.max.y
+  };
+}
+
+function buildSpecPDF(returnDoc){
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!JsPDF){ alert("Le module PDF n'a pas pu être chargé.\nVérifiez la connexion internet puis réessayez."); return; }
+
   const p = updatePrice();
   const frontId = P.front === 'same' ? P.body : P.front;
-  const txt =
-`FICHE TECHNIQUE — TABLE DE NUIT
-Généré le ${new Date().toLocaleDateString('fr-FR')}
+  const doc = new JsPDF({unit:'mm', format:'a4'});
+  const PW = 210, PH = 297, M = 15, CW = PW - 2*M;
 
-DIMENSIONS HORS TOUT
-  Largeur ............ ${P.W} cm
-  Profondeur ......... ${P.D} cm
-  Hauteur ............ ${P.H} cm
-  Hauteur des pieds .. ${P.legH} cm
-  Hauteur du caisson . ${(P.H - P.legH).toFixed(0)} cm
+  /* ---------- briques de mise en page ---------- */
+  const section = (label, y) => {
+    doc.setFillColor(PDF.accent); doc.rect(M, y - 3.3, 2.2, 4.6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(PDF.ink);
+    const t = label.toUpperCase();
+    doc.text(t, M + 5.5, y);
+    doc.setDrawColor(PDF.line); doc.setLineWidth(0.3);
+    doc.line(M + 8 + doc.getTextWidth(t), y - 1.1, PW - M, y - 1.1);
+    return y + 8;
+  };
 
-COMPOSITION
-  Tiroirs ............ ${P.drawers}
-  Pieds .............. 4 × ${LEGS[P.leg].name}
-  Plateau ............ ${P.overhang ? 'débordant (18 mm de débord)' : 'affleurant'}
+  const table = (list, y) => {
+    list.forEach((r, i) => {
+      if (i % 2 === 0){ doc.setFillColor(PDF.soft); doc.rect(M, y - 4.5, CW, 7, 'F'); }
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(PDF.grey);
+      doc.text(r[0], M + 3, y);
+      doc.setFont('helvetica','bold'); doc.setTextColor(PDF.ink);
+      doc.text(String(r[1]), PW - M - 3, y, {align:'right'});
+      y += 7;
+    });
+    return y;
+  };
 
-MATÉRIAUX
-  Caisson & plateau .. ${MATERIALS[P.body].name}
-  Façades tiroirs .... ${MATERIALS[frontId].name}
-  Poignées ........... ${HANDLES[P.handle].name}${P.handle==='gorge'?'':' — finition '+HARDWARE[P.hardware].name}
-  Caisses tiroirs .... contreplaqué bouleau 12 mm
+  const swatch = (label, name, color, y) => {
+    doc.setFillColor(PDF.soft); doc.rect(M, y, CW, 11, 'F');
+    doc.setFillColor(color); doc.setDrawColor('#9c9c9c'); doc.setLineWidth(0.2);
+    doc.roundedRect(M + 3.5, y + 2.5, 14, 6, 1, 1, 'FD');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(PDF.grey);
+    doc.text(label.toUpperCase(), M + 22, y + 4.6);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(PDF.ink);
+    doc.text(name, M + 22, y + 8.8);
+    return y + 13;
+  };
 
-QUANTITATIF
-  Panneaux caisson ... ${p.aBody.toFixed(2)} m² (ép. 18 mm / plateau 20 mm)
-  Panneaux façades ... ${p.aFront.toFixed(2)} m² (ép. 18 mm)
-  Fond ............... panneau 10 mm
+  const footer = (n) => {
+    doc.setDrawColor(PDF.line); doc.setLineWidth(0.3);
+    doc.line(M, PH - 14, PW - M, PH - 14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(PDF.grey);
+    doc.text('Configurateur table de nuit · document généré automatiquement', M, PH - 9.5);
+    doc.text(n + '/2', PW - M, PH - 9.5, {align:'right'});
+  };
 
-ESTIMATION
-  Caisson ............ ${Math.round(p.cBody)} €
-  Façades ............ ${Math.round(p.cFront)} €
-  Tiroirs (coulisses) ${p.cDraw} €
-  Pieds .............. ${p.cLegs} €
-  Quincaillerie ...... ${Math.round(p.cHand)} €
-  Façonnage .......... ${p.cLabor} €
-  ------------------------------
-  TOTAL INDICATIF .... ${Math.round(p.total)} €
+  /** Élévation encadrée, avec cotes vectorielles alignées sur le modèle. */
+  const elevation = (s, x, y, w, h, label, wCm, hCm) => {
+    doc.addImage(s.url, 'JPEG', x, y, w, h);
+    doc.setDrawColor(PDF.line); doc.setLineWidth(0.25);
+    doc.rect(x, y, w, h);
 
-Prix indicatifs, hors finition sur mesure et transport.
-`;
-  const a = document.createElement('a');
-  a.download = 'fiche-table-de-nuit.txt';
-  a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain;charset=utf-8'}));
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-});
+    const mapX = v => x + ((v - s.hCtr) + s.hw) / (2*s.hw) * w;
+    const mapY = v => y + (s.hh - (v - s.vCtr)) / (2*s.hh) * h;
+
+    doc.setDrawColor(PDF.accent); doc.setLineWidth(0.25);
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(PDF.accent);
+
+    // cote horizontale, sous la vue
+    const x1 = mapX(s.hMin), x2 = mapX(s.hMax), cy = y + h + 5.5;
+    doc.line(x1, cy, x2, cy);
+    doc.line(x1, cy - 1.6, x1, cy + 1.6);
+    doc.line(x2, cy - 1.6, x2, cy + 1.6);
+    const tw = wCm + ' cm', twW = doc.getTextWidth(tw);
+    doc.setFillColor('#ffffff');
+    doc.rect((x1 + x2)/2 - twW/2 - 1.2, cy - 2.6, twW + 2.4, 4.6, 'F');
+    doc.text(tw, (x1 + x2)/2, cy + 1, {align:'center'});
+
+    // cote verticale, à gauche
+    const y1 = mapY(s.vMax), y2 = mapY(s.vMin), cx = x - 4;
+    doc.line(cx, y1, cx, y2);
+    doc.line(cx - 1.6, y1, cx + 1.6, y1);
+    doc.line(cx - 1.6, y2, cx + 1.6, y2);
+    doc.text(hCm + ' cm', cx - 1.2, (y1 + y2)/2, {align:'center', angle:90});
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(PDF.ink);
+    doc.text(label.toUpperCase(), x + w/2, y + h + 12, {align:'center'});
+  };
+
+  /* ================= PAGE 1 ================= */
+  doc.setFillColor(PDF.ink);   doc.rect(0, 0, PW, 36, 'F');
+  doc.setFillColor(PDF.accent); doc.rect(0, 36, PW, 1.8, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(21); doc.setTextColor('#ffffff');
+  doc.text('TABLE DE NUIT', M, 19);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor('#a9b0bd');
+  doc.text('Fiche technique · ' + dateFR(), M, 26.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(PDF.accent);
+  doc.text(P.W + ' × ' + P.D + ' × ' + P.H + ' cm', PW - M, 19, {align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor('#a9b0bd');
+  doc.text(P.drawers + ' tiroir' + (P.drawers > 1 ? 's' : '') + ' · ' + LEGS[P.leg].name,
+           PW - M, 26.5, {align:'right'});
+
+  const heroH = CW * 0.52;
+  doc.addImage(shotHero(1540, 800), 'JPEG', M, 45, CW, heroH);
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(PDF.grey);
+  doc.text('Vue de synthèse — rendu non contractuel', PW - M, 45 + heroH + 4, {align:'right'});
+
+  const legH = cm(P.legH), bodyH = cm(P.H) - legH, sideH = bodyH - T_TOP;
+  const Hi = sideH - T, fh = (Hi - GAP*(P.drawers + 1)) / P.drawers;
+
+  let y = section('Composition', 45 + heroH + 14);
+  y = table([
+    ['Dimensions hors tout',      P.W + ' × ' + P.D + ' × ' + P.H + ' cm'],
+    ['Hauteur des pieds',         P.legH + ' cm'],
+    ['Hauteur du caisson',        (P.H - P.legH) + ' cm'],
+    ['Tiroirs',                   P.drawers + ' × façade H ' + (fh*100).toFixed(1) + ' cm'],
+    ['Pieds',                     '4 × ' + LEGS[P.leg].name],
+    ['Plateau',                   P.overhang ? 'débordant (18 mm)' : 'affleurant'],
+    ['Jeu entre façades',    '3 mm']
+  ], y);
+
+  y = section('Matériaux et finitions', y + 9);
+  y = swatch('Caisson et plateau', MATERIALS[P.body].name,  MATERIALS[P.body].base,  y);
+  y = swatch('Façades de tiroirs', MATERIALS[frontId].name, MATERIALS[frontId].base, y);
+  y = swatch('Poignées', HANDLES[P.handle].name +
+      (P.handle === 'gorge' ? '' : ' · ' + HARDWARE[P.hardware].name),
+      P.handle === 'gorge' ? MATERIALS[frontId].base : HARDWARE[P.hardware].color, y);
+  y = swatch('Caisses de tiroir', 'Contreplaqué bouleau 12 mm', '#d9c39c', y);
+  footer(1);
+
+  /* ================= PAGE 2 ================= */
+  doc.addPage();
+  doc.setFillColor(PDF.ink);    doc.rect(0, 0, PW, 17, 'F');
+  doc.setFillColor(PDF.accent); doc.rect(0, 17, PW, 1.2, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor('#ffffff');
+  doc.text('TABLE DE NUIT · FICHE TECHNIQUE', M, 11);
+  doc.setFont('helvetica','normal'); doc.setTextColor('#a9b0bd');
+  doc.text(P.W + ' × ' + P.D + ' × ' + P.H + ' cm', PW - M, 11, {align:'right'});
+
+  y = section('Élévations cotées', 32);
+  const iw = 80, ih = 88, gap = CW - 2*iw;
+  elevation(shotElevation('face', 760, 836), M,            y, iw, ih, 'Face',   P.W, P.H);
+  elevation(shotElevation('cote', 760, 836), M + iw + gap, y, iw, ih, 'Profil', P.D, P.H);
+  y += ih + 22;
+
+  y = section('Quantitatif matière', y);
+  y = table([
+    ['Panneaux caisson (ép. 18 mm, plateau 20 mm)', p.aBody.toFixed(2) + ' m²'],
+    ['Panneaux façades (ép. 18 mm)',           p.aFront.toFixed(2) + ' m²'],
+    ['Panneau de fond (ép. 10 mm)',                 'inclus'],
+    ['Total panneaux',                                   (p.aBody + p.aFront).toFixed(2) + ' m²']
+  ], y);
+
+  y = section('Estimation', y + 9);
+  y = table([
+    ['Caisson et plateau — ' + MATERIALS[P.body].name,  eur(p.cBody)],
+    ['Façades — ' + MATERIALS[frontId].name,       eur(p.cFront)],
+    ['Tiroirs et coulisses',                                 eur(p.cDraw)],
+    ['Pieds — ' + LEGS[P.leg].name,                     eur(p.cLegs)],
+    ['Quincaillerie',                                        eur(p.cHand)],
+    ['Façonnage et assemblage',                         eur(p.cLabor)]
+  ], y);
+
+  doc.setFillColor(PDF.accent); doc.rect(M, y - 4.6, CW, 10, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor('#ffffff');
+  doc.text('TOTAL INDICATIF', M + 3, y + 1.4);
+  doc.setFontSize(13);
+  doc.text(eur(p.total), PW - M - 3, y + 1.6, {align:'right'});
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(PDF.grey);
+  doc.text('Prix indicatifs hors finition sur mesure, livraison et pose. '
+         + 'Cotes en centimètres, tolérance de fabrication ± 2 mm.', M, y + 13);
+  footer(2);
+
+  if (returnDoc) return doc;
+  doc.save(stamp() + '_fiche.pdf');
+}
+
+document.getElementById('btn-spec').addEventListener('click', () => buildSpecPDF());
 
 document.getElementById('btn-reset').addEventListener('click', () => {
   Object.assign(P, DEFAULTS);
@@ -1065,7 +1258,8 @@ loop();
 document.getElementById('loader').remove();
 
 // Petite API publique (pilotage externe / capture)
-window.tableDeNuit = {THREE, scene, camera, renderer, controls, params:P, build, resize};
+window.tableDeNuit = {THREE, scene, camera, renderer, controls, params:P, build, resize,
+                      specPDF:buildSpecPDF, shots:{hero:shotHero, elevation:shotElevation}};
 </script>
 </body>
 </html>
